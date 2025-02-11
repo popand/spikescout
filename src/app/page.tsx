@@ -509,7 +509,7 @@ export default function Dashboard() {
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto text-center px-4 relative">
+              <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto text-center px-4 relative -z-10">
                 {/* Decorative background elements */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                   <div className="absolute top-1/4 -right-24 w-96 h-96 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full opacity-50 blur-3xl"></div>
