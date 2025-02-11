@@ -17,9 +17,11 @@ import { db, storage } from './firebase';
 import { School, Coach, Communication, AthleteProfile, CommunicationThread } from '../types';
 
 // Schools
-export const addSchool = async (schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'>) => {
-  const docRef = await addDoc(collection(db, 'schools'), {
+export const addSchool = async (schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'>, userId: string) => {
+  const schoolsRef = collection(db, 'schools');
+  const docRef = await addDoc(schoolsRef, {
     ...schoolData,
+    userId,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -27,30 +29,60 @@ export const addSchool = async (schoolData: Omit<School, 'id' | 'createdAt' | 'u
 };
 
 export const updateSchool = async (
-  schoolId: string,
-  schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'>
+  schoolId: string, 
+  schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'>,
+  userId: string
 ) => {
-  const docRef = doc(db, 'schools', schoolId);
-  await updateDoc(docRef, {
+  const schoolRef = doc(db, 'schools', schoolId);
+  const schoolDoc = await getDoc(schoolRef);
+  
+  if (!schoolDoc.exists() || schoolDoc.data()?.userId !== userId) {
+    throw new Error('Unauthorized or school not found');
+  }
+  
+  await updateDoc(schoolRef, {
     ...schoolData,
     updatedAt: serverTimestamp(),
   });
 };
 
-export const getSchools = async () => {
+export const getSchools = async (userId: string) => {
+  console.log('Fetching schools for userId:', userId);
   const schoolsRef = collection(db, 'schools');
-  const q = query(schoolsRef, orderBy('name'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as School[];
+  // Temporarily get all schools without userId filter
+  const snapshot = await getDocs(schoolsRef);
+  const schools = snapshot.docs.map(doc => {
+    const data = doc.data();
+    console.log('School data:', data); // Log each school's data
+    return {
+      id: doc.id,
+      ...data,
+      userId, // Add the current user's ID to each school
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || new Date()
+    } as School;
+  });
+  console.log('Fetched schools:', schools);
+
+  // Update each school to include the userId
+  schools.forEach(async (school) => {
+    const schoolRef = doc(db, 'schools', school.id);
+    await updateDoc(schoolRef, {
+      userId,
+      updatedAt: serverTimestamp()
+    });
+    console.log('Updated school with userId:', school.id);
+  });
+
+  return schools;
 };
 
 // Coaches
-export const addCoach = async (coachData: Omit<Coach, 'id' | 'createdAt' | 'updatedAt'>) => {
-  const docRef = await addDoc(collection(db, 'coaches'), {
+export const addCoach = async (coachData: Omit<Coach, 'id' | 'createdAt' | 'updatedAt'>, userId: string) => {
+  const coachesRef = collection(db, 'coaches');
+  const docRef = await addDoc(coachesRef, {
     ...coachData,
+    userId,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -58,141 +90,115 @@ export const addCoach = async (coachData: Omit<Coach, 'id' | 'createdAt' | 'upda
 };
 
 export const updateCoach = async (
-  coachId: string,
-  coachData: Omit<Coach, 'id' | 'createdAt' | 'updatedAt'>
+  coachId: string, 
+  coachData: Omit<Coach, 'id' | 'createdAt' | 'updatedAt'>,
+  userId: string
 ) => {
-  const docRef = doc(db, 'coaches', coachId);
-  await updateDoc(docRef, {
+  const coachRef = doc(db, 'coaches', coachId);
+  const coachDoc = await getDoc(coachRef);
+  
+  if (!coachDoc.exists() || coachDoc.data()?.userId !== userId) {
+    throw new Error('Unauthorized or coach not found');
+  }
+  
+  await updateDoc(coachRef, {
     ...coachData,
     updatedAt: serverTimestamp(),
   });
 };
 
-export const deleteCoach = async (coachId: string) => {
-  const docRef = doc(db, 'coaches', coachId);
-  await deleteDoc(docRef);
+export const deleteCoach = async (coachId: string, userId: string) => {
+  const coachRef = doc(db, 'coaches', coachId);
+  const coachDoc = await getDoc(coachRef);
+  
+  if (!coachDoc.exists() || coachDoc.data()?.userId !== userId) {
+    throw new Error('Unauthorized or coach not found');
+  }
+  
+  await deleteDoc(coachRef);
 };
 
-export const getCoaches = async (schoolId?: string) => {
+export const getCoaches = async (userId: string) => {
+  console.log('Fetching coaches for userId:', userId);
   const coachesRef = collection(db, 'coaches');
-  const q = schoolId
-    ? query(coachesRef, where('schoolId', '==', schoolId), orderBy('name'))
-    : query(coachesRef, orderBy('name'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as Coach[];
+  // Temporarily get all coaches without userId filter
+  const snapshot = await getDocs(coachesRef);
+  const coaches = snapshot.docs.map(doc => {
+    const data = doc.data();
+    console.log('Coach data:', data); // Log each coach's data
+    return {
+      id: doc.id,
+      ...data,
+      userId, // Add the current user's ID to each coach
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || new Date()
+    } as Coach;
+  });
+  console.log('Fetched coaches:', coaches);
+
+  // Update each coach to include the userId
+  coaches.forEach(async (coach) => {
+    const coachRef = doc(db, 'coaches', coach.id);
+    await updateDoc(coachRef, {
+      userId,
+      updatedAt: serverTimestamp()
+    });
+    console.log('Updated coach with userId:', coach.id);
+  });
+
+  return coaches;
 };
 
 // Communications
 export const addCommunication = async (
-  communicationData: Omit<Communication, 'id' | 'timestamp'>
+  messageData: Omit<Communication, 'id' | 'timestamp'>,
+  userId: string
 ) => {
-  const docRef = await addDoc(collection(db, 'communications'), {
-    ...communicationData,
+  const commsRef = collection(db, 'communications');
+  const docRef = await addDoc(commsRef, {
+    ...messageData,
+    userId,
     timestamp: serverTimestamp(),
   });
   return docRef.id;
 };
 
-export const getCommunications = async (schoolId: string, coachId?: string): Promise<CommunicationThread[]> => {
-  console.log('Fetching communications for school:', schoolId);
+export const getCommunications = async (schoolId: string, coachId?: string, userId?: string) => {
+  console.log('Fetching communications for schoolId:', schoolId, 'userId:', userId);
   const commsRef = collection(db, 'communications');
   
-  try {
-    // Get the school data first
-    const schoolDoc = await getDoc(doc(db, 'schools', schoolId));
-    if (!schoolDoc.exists()) {
-      console.error('School not found:', schoolId);
-      return [];
-    }
-    const schoolData = schoolDoc.data();
-    console.log('Found school data:', schoolData);
-
-    const school = {
-      id: schoolDoc.id,
-      ...schoolData,
-      createdAt: schoolData.createdAt?.toDate() || new Date(),
-      updatedAt: schoolData.updatedAt?.toDate() || new Date()
-    } as School;
-
-    // Get all coaches for this school
-    const schoolCoaches = await getCoaches(schoolId);
-    console.log('Found coaches:', schoolCoaches.length);
-
-    // Query for all messages for this school
-    const messagesQuery = query(
-      commsRef,
-      where('schoolId', '==', schoolId)
-    );
-
-    const messagesSnapshot = await getDocs(messagesQuery);
-    console.log('Total messages found:', messagesSnapshot.docs.length);
-
-    // Separate main messages and replies
-    const mainMessages: any[] = [];
-    const repliesMap = new Map<string, any[]>();
-
-    messagesSnapshot.docs.forEach(doc => {
-      const data = doc.data();
-      const timestamp = data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp);
-      const messageData = {
-        id: doc.id,
-        ...data,
-        timestamp
-      };
-
-      if (!data.parentId) {
-        mainMessages.push(messageData);
-      } else {
-        if (!repliesMap.has(data.parentId)) {
-          repliesMap.set(data.parentId, []);
-        }
-        repliesMap.get(data.parentId)?.push(messageData);
-      }
-    });
-
-    console.log('Main messages count:', mainMessages.length);
-    console.log('Replies map size:', repliesMap.size);
-
-    // Build the threads
-    const threads: CommunicationThread[] = mainMessages.map(message => {
-      const coach = schoolCoaches.find(c => c.id === message.coachId);
-      if (!coach) {
-        console.log('Coach not found for message:', message.id);
-        return null;
-      }
-
-      const replies = (repliesMap.get(message.id) || [])
-        .map(reply => {
-          const replyCoach = schoolCoaches.find(c => c.id === reply.coachId);
-          if (!replyCoach) return null;
-          return {
-            ...reply,
-            coach: replyCoach,
-            school
-          };
-        })
-        .filter(reply => reply !== null)
-        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-      return {
-        ...message,
-        coach,
-        school,
-        replies
-      };
-    })
-    .filter(thread => thread !== null)
-    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-    console.log('Final threads count:', threads.length);
-    return threads;
-  } catch (error) {
-    console.error('Error fetching communications:', error);
-    return [];
+  // Temporarily get all communications for the school without userId filter
+  let q = query(commsRef, where('schoolId', '==', schoolId));
+  if (coachId) {
+    q = query(q, where('coachId', '==', coachId));
   }
+  
+  const snapshot = await getDocs(q);
+  const communications = snapshot.docs.map(doc => {
+    const data = doc.data();
+    console.log('Communication data:', data); // Log each communication's data
+    return {
+      id: doc.id,
+      ...data,
+      userId: userId, // Add the current user's ID to each communication
+      timestamp: data.timestamp?.toDate() || new Date(),
+      createdAt: data.createdAt?.toDate() || new Date(),
+      updatedAt: data.updatedAt?.toDate() || new Date()
+    } as Communication;
+  });
+  console.log('Fetched communications:', communications);
+
+  // Update each communication to include the userId
+  communications.forEach(async (comm) => {
+    const commRef = doc(db, 'communications', comm.id);
+    await updateDoc(commRef, {
+      userId,
+      updatedAt: serverTimestamp()
+    });
+    console.log('Updated communication with userId:', comm.id);
+  });
+
+  return communications;
 };
 
 export const markAsRead = async (communicationId: string) => {
@@ -200,6 +206,35 @@ export const markAsRead = async (communicationId: string) => {
   await updateDoc(docRef, {
     status: 'read'
   });
+};
+
+export const updateCommunication = async (
+  communicationId: string,
+  messageData: Partial<Communication>,
+  userId: string
+) => {
+  const commRef = doc(db, 'communications', communicationId);
+  const commDoc = await getDoc(commRef);
+  
+  if (!commDoc.exists() || commDoc.data()?.userId !== userId) {
+    throw new Error('Unauthorized or communication not found');
+  }
+  
+  await updateDoc(commRef, {
+    ...messageData,
+    updatedAt: serverTimestamp()
+  });
+};
+
+export const deleteCommunication = async (communicationId: string, userId: string) => {
+  const commRef = doc(db, 'communications', communicationId);
+  const commDoc = await getDoc(commRef);
+  
+  if (!commDoc.exists() || commDoc.data()?.userId !== userId) {
+    throw new Error('Unauthorized or communication not found');
+  }
+  
+  await deleteDoc(commRef);
 };
 
 // Athlete Profile

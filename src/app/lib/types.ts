@@ -1,25 +1,59 @@
-export type School = {
+export interface BaseModel {
   id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+}
+
+export interface School extends BaseModel {
   name: string;
   location: string;
   division: string;
-  programs: string[];
-  athleticDetails: string;
   description: string;
+  athleticDetails: string;
   volleyballHistory: string;
-  notes: string;
-  tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
-};
+  programs: string[];
+  notes?: string;
+  tags?: string[];
+}
 
-export type AthleteProfile = {
-  id: string;
+export interface Coach extends BaseModel {
+  name: string;
+  title: string;
+  email: string;
+  phone?: string;
+  schoolId: string;
+}
+
+export type MessageType = 'email' | 'phone' | 'visit' | 'other';
+export type MessageDirection = 'incoming' | 'outgoing';
+export type MessageStatus = 'read' | 'unread';
+
+export interface Communication extends BaseModel {
+  content: string;
+  type: MessageType;
+  direction: MessageDirection;
+  status: MessageStatus;
+  schoolId: string;
+  coachId: string;
+  parentId?: string;
+  timestamp: Date;
+}
+
+export interface CommunicationWithCoach extends Communication {
+  coach: Coach;
+  school: School;
+}
+
+export interface CommunicationThread extends CommunicationWithCoach {
+  replies: CommunicationWithCoach[];
+}
+
+export interface AthleteProfile extends BaseModel {
   name: string;
   birthday: Date;
   description: string;
   interests: string[];
-  avatarUrl?: string;
   stats: {
     position: string;
     height: string;
@@ -31,42 +65,9 @@ export type AthleteProfile = {
     club: string;
   };
   mediaLinks: {
-    type: 'youtube' | 'instagram' | 'hudl' | 'other';
+    type: string;
     url: string;
     title: string;
   }[];
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-export type Coach = {
-  id: string;
-  name: string;
-  title: string;
-  schoolId: string;
-  email: string;
-  phone?: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-export type Communication = {
-  id: string;
-  schoolId: string;
-  coachId: string;
-  content: string;
-  direction: 'incoming' | 'outgoing';
-  status: 'read' | 'unread';
-  type: 'email' | 'phone' | 'visit' | 'other';
-  timestamp: Date;
-  parentId?: string;
-};
-
-export type CommunicationWithCoach = Communication & {
-  coach: Coach;
-};
-
-export type CommunicationThread = CommunicationWithCoach & {
-  school: School;
-  replies: CommunicationWithCoach[];
-}; 
+  avatarUrl?: string;
+} 

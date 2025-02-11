@@ -16,6 +16,7 @@ interface SchoolsListProps {
   onSchoolAdded: () => void;
   onSchoolUpdated: () => void;
   onCoachesUpdated: () => void;
+  userId: string;
 }
 
 export default function SchoolsList({
@@ -28,7 +29,10 @@ export default function SchoolsList({
   onSchoolAdded,
   onSchoolUpdated,
   onCoachesUpdated,
+  userId,
 }: SchoolsListProps) {
+  console.log('SchoolsList rendering with schools:', schools);
+
   const [showSchoolForm, setShowSchoolForm] = useState(false);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
   const [expandedSchool, setExpandedSchool] = useState<string | null>(null);
@@ -37,21 +41,23 @@ export default function SchoolsList({
   const [activeSchoolForCoach, setActiveSchoolForCoach] = useState<School | null>(null);
 
   const handleAddSchool = async (schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'>) => {
-    await addSchool(schoolData);
+    console.log('Adding new school:', schoolData);
+    await addSchool(schoolData, userId);
     setShowSchoolForm(false);
     onSchoolAdded();
   };
 
   const handleEditSchool = async (schoolData: Omit<School, 'id' | 'createdAt' | 'updatedAt'>) => {
+    console.log('Editing school:', schoolData);
     if (editingSchool) {
-      await updateSchool(editingSchool.id, schoolData);
+      await updateSchool(editingSchool.id, schoolData, userId);
       setEditingSchool(null);
       onSchoolUpdated();
     }
   };
 
   const handleAddCoach = async (coachData: Omit<Coach, 'id' | 'createdAt' | 'updatedAt'>) => {
-    await addCoach(coachData);
+    await addCoach(coachData, userId);
     setShowCoachForm(false);
     setActiveSchoolForCoach(null);
     onCoachesUpdated();
@@ -59,7 +65,7 @@ export default function SchoolsList({
 
   const handleEditCoach = async (coachData: Omit<Coach, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (editingCoach) {
-      await updateCoach(editingCoach.id, coachData);
+      await updateCoach(editingCoach.id, coachData, userId);
       setEditingCoach(null);
       onCoachesUpdated();
     }
@@ -67,7 +73,7 @@ export default function SchoolsList({
 
   const handleDeleteCoach = async (coach: Coach) => {
     if (confirm('Are you sure you want to delete this coach?')) {
-      await deleteCoach(coach.id);
+      await deleteCoach(coach.id, userId);
       onCoachesUpdated();
     }
   };

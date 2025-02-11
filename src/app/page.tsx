@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { School, Coach, Communication, CommunicationThread, AthleteProfile } from './lib/types';
+import { School, Coach, Communication, CommunicationThread, CommunicationWithCoach, AthleteProfile } from './lib/types';
 import {
   getSchools,
   getCoaches,
@@ -26,6 +26,7 @@ const defaultAthleteProfile: Omit<AthleteProfile, 'id' | 'createdAt' | 'updatedA
   birthday: new Date(),
   description: '',
   interests: [],
+  userId: '', // Will be set when creating profile
   stats: {
     position: '',
     height: '',
@@ -52,14 +53,22 @@ export default function Dashboard() {
 
   const loadSchools = async () => {
     if (user) {
-      const schoolsData = await getSchools();
-      setSchools(schoolsData);
+      console.log('Loading schools for user:', user.uid);
+      try {
+        const schoolsData = await getSchools(user.uid);
+        console.log('Schools data received:', schoolsData);
+        setSchools(schoolsData);
+      } catch (error) {
+        console.error('Error loading schools:', error);
+      }
+    } else {
+      console.log('No user available to load schools');
     }
   };
 
   const loadCoaches = async () => {
     if (user) {
-      const coachesData = await getCoaches();
+      const coachesData = await getCoaches(user.uid);
       setCoaches(coachesData);
     }
   };
@@ -74,45 +83,75 @@ export default function Dashboard() {
   };
 
   const loadCommunications = async () => {
-    if (selectedSchool) {
+    if (selectedSchool && user) {
       try {
         console.log('Loading communications for school:', selectedSchool.name);
-        const commsData = await getCommunications(selectedSchool.id, selectedCoach?.id);
+        const commsData = await getCommunications(selectedSchool.id, selectedCoach?.id, user.uid);
         console.log('Loaded communications:', commsData.length);
         
         // Sort communications by timestamp in descending order (newest first)
-        const sortedComms = commsData.filter(comm => comm.schoolId === selectedSchool.id)
+        const sortedComms = commsData
+          .filter(comm => comm.schoolId === selectedSchool.id && comm.userId === user.uid)
           .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        
         console.log('Filtered and sorted communications:', sortedComms.length);
         
-        const threadsWithDetails: CommunicationThread[] = sortedComms.map(comm => ({
-          ...comm,
-          school: selectedSchool,
-          coach: coaches.find(c => c.id === comm.coachId)!,
-          replies: comm.replies?.filter(reply => reply.schoolId === selectedSchool.id)
-            .map(reply => ({
-              ...reply,
+        // Convert to threads with details
+        const threadsWithDetails = sortedComms
+          .filter(comm => !comm.parentId) // Get only parent messages
+          .map(comm => {
+            const coach = coaches.find(c => c.id === comm.coachId);
+            if (!coach) {
+              console.error('Coach not found for communication:', comm.id);
+              return null;
+            }
+
+            // Find all replies for this thread
+            const replies = sortedComms
+              .filter(reply => reply.parentId === comm.id)
+              .map(reply => ({
+                ...reply,
+                coach,
+                school: selectedSchool
+              }));
+
+            const thread: CommunicationThread = {
+              ...comm,
               school: selectedSchool,
-              coach: coaches.find(c => c.id === reply.coachId)!
-            }))
-        }));
+              coach,
+              replies: replies
+            };
+            
+            return thread;
+          }).filter((thread): thread is CommunicationThread => thread !== null);
+        
         console.log('Final threads with details:', threadsWithDetails.length);
         setCommunications(threadsWithDetails);
       } catch (error) {
         console.error('Error loading communications:', error);
       }
     } else {
-      console.log('No school selected, clearing communications');
+      console.log('No school selected or no user, clearing communications');
       setCommunications([]);
     }
   };
 
-  // Load initial data
+  // Clear state when user changes
   useEffect(() => {
     if (user) {
       loadSchools();
       loadCoaches();
       loadAthleteProfile();
+    } else {
+      // Clear all state when user logs out
+      setSchools([]);
+      setCoaches([]);
+      setSelectedSchool(null);
+      setSelectedCoach(null);
+      setCommunications([]);
+      setAthleteProfile(null);
+      setIsEditingProfile(false);
+      setShowMessageForm(false);
     }
   }, [user]);
 
@@ -121,12 +160,43 @@ export default function Dashboard() {
     loadCommunications();
   }, [selectedSchool, selectedCoach, coaches]);
 
+  // Reload data periodically
+  useEffect(() => {
+    if (user) {
+      // Initial load
+      loadSchools();
+      loadCoaches();
+      
+      // Set up periodic refresh
+      const refreshInterval = setInterval(() => {
+        loadSchools();
+        loadCoaches();
+        if (selectedSchool) {
+          loadCommunications();
+        }
+      }, 30000); // Refresh every 30 seconds
+
+      // Cleanup
+      return () => clearInterval(refreshInterval);
+    }
+  }, [user, selectedSchool]);
+
+  // Add logging to track schools state changes
+  useEffect(() => {
+    console.log('Schools state updated:', schools);
+  }, [schools]);
+
   const handleSendMessage = async (messageData: Omit<Communication, 'id' | 'timestamp'>) => {
-    if (!selectedSchool) return;
+    if (!selectedSchool || !user) return;
 
     try {
-      // Add the communication
-      const messageId = await addCommunication(messageData);
+      // Add the communication with required fields
+      const messageId = await addCommunication({
+        ...messageData,
+        userId: user.uid,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }, user.uid);
       
       // Find the coach for this message
       const coach = coaches.find(c => c.id === messageData.coachId);
@@ -134,11 +204,14 @@ export default function Dashboard() {
         throw new Error('Coach not found');
       }
 
-      // Create the new thread with the current timestamp
+      // Create the new thread
       const newThread: CommunicationThread = {
         id: messageId,
         ...messageData,
+        userId: user.uid,
         timestamp: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
         coach,
         school: selectedSchool,
         replies: []
@@ -154,47 +227,40 @@ export default function Dashboard() {
       loadCommunications();
     } catch (error) {
       console.error('Error sending message:', error);
-      // You might want to show an error message to the user here
     }
   };
 
   const handleReply = async (content: string, parentId: string, coachId: string) => {
-    if (!selectedSchool) return;
+    if (!selectedSchool || !user) return;
 
     try {
       // Find the original message to get the coach ID
       const originalMessage = communications.find(comm => comm.id === parentId);
       if (!originalMessage) return;
 
-      // Add the reply to the database
-      const replyId = await addCommunication({
+      const replyData: Omit<Communication, 'id' | 'timestamp'> = {
         schoolId: selectedSchool.id,
         coachId: originalMessage.coachId,
         content,
         direction: 'outgoing',
         status: 'read',
         type: 'other',
-        parentId
-      });
+        parentId,
+        userId: user.uid,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
-      // Find the coach for this reply
-      const coach = coaches.find(c => c.id === originalMessage.coachId);
-      if (!coach) {
-        throw new Error('Coach not found');
-      }
+      // Add the reply to the database
+      const replyId = await addCommunication(replyData, user.uid);
 
       // Create the new reply object
-      const newReply = {
+      const newReply: CommunicationWithCoach = {
         id: replyId,
-        schoolId: selectedSchool.id,
-        coachId: originalMessage.coachId,
-        content,
-        direction: 'outgoing' as const,
-        status: 'read' as const,
-        type: 'other' as const,
+        ...replyData,
         timestamp: new Date(),
-        parentId,
-        coach,
+        coach: originalMessage.coach,
+        school: selectedSchool
       };
 
       // Update the communications state by adding the reply to the correct thread
@@ -256,8 +322,15 @@ export default function Dashboard() {
       <div className="bg-white shadow-sm border-b border-gray-100">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">SpikeScout</h1>
+            <div className="flex items-center space-x-2">
+              <img 
+                src="/images/vball.webp" 
+                alt="SpikeScout Logo" 
+                className="h-12 w-auto"
+              />
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">
+                SpikeScout
+              </h1>
             </div>
             <div className="flex items-center space-x-6">
               <span className="text-sm text-gray-600">{user.email}</span>
@@ -311,6 +384,7 @@ export default function Dashboard() {
               onSchoolAdded={loadSchools}
               onSchoolUpdated={loadSchools}
               onCoachesUpdated={loadCoaches}
+              userId={user.uid}
             />
           </div>
         </div>
@@ -339,6 +413,17 @@ export default function Dashboard() {
                 <div className="space-y-6">
                   {showMessageForm && (
                     <div className="mb-8">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900">New Message</h3>
+                        <button
+                          onClick={() => setShowMessageForm(false)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
                       <MessageForm
                         school={selectedSchool}
                         coaches={coaches.filter(coach => coach.schoolId === selectedSchool.id)}
@@ -351,6 +436,11 @@ export default function Dashboard() {
                       key={thread.id} 
                       thread={thread}
                       onReply={handleReply}
+                      userId={user.uid}
+                      onDelete={() => {
+                        // Remove the deleted thread from the state
+                        setCommunications(prev => prev.filter(t => t.id !== thread.id));
+                      }}
                     />
                   ))}
                   {communications.length === 0 && (
