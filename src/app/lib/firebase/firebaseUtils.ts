@@ -47,33 +47,32 @@ export const updateSchool = async (
 };
 
 export const getSchools = async (userId: string) => {
+  if (!userId) {
+    console.error('No userId provided for getSchools');
+    return [];
+  }
+
   console.log('Fetching schools for userId:', userId);
   const schoolsRef = collection(db, 'schools');
-  // Temporarily get all schools without userId filter
-  const snapshot = await getDocs(schoolsRef);
+  
+  // Create query with userId filter
+  const q = query(schoolsRef, where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  
+  console.log('Found', snapshot.docs.length, 'schools for user');
+  
   const schools = snapshot.docs.map(doc => {
     const data = doc.data();
-    console.log('School data:', data); // Log each school's data
+    console.log('School data:', { id: doc.id, ...data });
     return {
       id: doc.id,
       ...data,
-      userId, // Add the current user's ID to each school
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date()
     } as School;
   });
-  console.log('Fetched schools:', schools);
-
-  // Update each school to include the userId
-  schools.forEach(async (school) => {
-    const schoolRef = doc(db, 'schools', school.id);
-    await updateDoc(schoolRef, {
-      userId,
-      updatedAt: serverTimestamp()
-    });
-    console.log('Updated school with userId:', school.id);
-  });
-
+  
+  console.log('Processed schools:', schools);
   return schools;
 };
 
@@ -121,31 +120,20 @@ export const deleteCoach = async (coachId: string, userId: string) => {
 export const getCoaches = async (userId: string) => {
   console.log('Fetching coaches for userId:', userId);
   const coachesRef = collection(db, 'coaches');
-  // Temporarily get all coaches without userId filter
-  const snapshot = await getDocs(coachesRef);
+  const q = query(coachesRef, where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  
   const coaches = snapshot.docs.map(doc => {
     const data = doc.data();
-    console.log('Coach data:', data); // Log each coach's data
     return {
       id: doc.id,
       ...data,
-      userId, // Add the current user's ID to each coach
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date()
     } as Coach;
   });
+  
   console.log('Fetched coaches:', coaches);
-
-  // Update each coach to include the userId
-  coaches.forEach(async (coach) => {
-    const coachRef = doc(db, 'coaches', coach.id);
-    await updateDoc(coachRef, {
-      userId,
-      updatedAt: serverTimestamp()
-    });
-    console.log('Updated coach with userId:', coach.id);
-  });
-
   return coaches;
 };
 
@@ -164,11 +152,21 @@ export const addCommunication = async (
 };
 
 export const getCommunications = async (schoolId: string, coachId?: string, userId?: string) => {
+  if (!userId) {
+    console.error('No userId provided for getCommunications');
+    return [];
+  }
+
   console.log('Fetching communications for schoolId:', schoolId, 'userId:', userId);
   const commsRef = collection(db, 'communications');
   
-  // Temporarily get all communications for the school without userId filter
-  let q = query(commsRef, where('schoolId', '==', schoolId));
+  // Create query with userId and schoolId filters
+  let q = query(
+    commsRef, 
+    where('userId', '==', userId),
+    where('schoolId', '==', schoolId)
+  );
+  
   if (coachId) {
     q = query(q, where('coachId', '==', coachId));
   }
@@ -176,28 +174,16 @@ export const getCommunications = async (schoolId: string, coachId?: string, user
   const snapshot = await getDocs(q);
   const communications = snapshot.docs.map(doc => {
     const data = doc.data();
-    console.log('Communication data:', data); // Log each communication's data
     return {
       id: doc.id,
       ...data,
-      userId: userId, // Add the current user's ID to each communication
       timestamp: data.timestamp?.toDate() || new Date(),
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date()
     } as Communication;
   });
+  
   console.log('Fetched communications:', communications);
-
-  // Update each communication to include the userId
-  communications.forEach(async (comm) => {
-    const commRef = doc(db, 'communications', comm.id);
-    await updateDoc(commRef, {
-      userId,
-      updatedAt: serverTimestamp()
-    });
-    console.log('Updated communication with userId:', comm.id);
-  });
-
   return communications;
 };
 

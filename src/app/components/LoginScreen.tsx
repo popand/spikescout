@@ -18,18 +18,27 @@ export default function LoginScreen() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Volleyball Recruitment CRM
+          <div className="flex justify-center">
+            <Image 
+              src="/images/vball.webp" 
+              alt="SpikeScout Logo" 
+              width={64}
+              height={64}
+              className="h-16 w-16"
+            />
+          </div>
+          <h2 className="mt-4 text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+            SpikeScout
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            Sign in to manage your college recruitment communications
+            Your Volleyball Recruitment Journey Starts Here
           </p>
         </div>
         
         <div className="mt-8 space-y-6">
           <button
             onClick={handleGoogleSignIn}
-            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-150"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path
@@ -49,13 +58,13 @@ export default function LoginScreen() {
                 fill="#EA4335"
               />
             </svg>
-            Sign in with Google
+            Continue with Google
           </button>
         </div>
 
         <div className="mt-6">
           <p className="text-center text-sm text-gray-600">
-            Keep track of all your college volleyball recruitment communications in one place
+            Track communications, generate messages, and manage your volleyball recruitment journey
           </p>
         </div>
       </div>
