@@ -2,7 +2,7 @@
 
 SpikeScout is a comprehensive Customer Relationship Management (CRM) system designed specifically for volleyball athletes managing their college recruitment process. Built with Next.js 14, TypeScript, and Firebase, it helps athletes track communications with coaches, manage school information, and streamline the recruitment journey.
 
-## Features
+## Features 
 
 - **School Management**
   - Add and track potential schools
