@@ -9,7 +9,8 @@ import {
   addCommunication,
   getAthleteProfile,
   updateAthleteProfile,
-  createAthleteProfile
+  createAthleteProfile,
+  updateSchool
 } from './lib/firebase/firebaseUtils';
 import SchoolsList from './components/SchoolsList';
 import CommunicationThreadView from './components/CommunicationThread';
@@ -19,6 +20,7 @@ import AthleteProfileForm from './components/AthleteProfileForm';
 import LoginScreen from './components/LoginScreen';
 import { useAuth } from './lib/hooks/useAuth';
 import { auth } from './lib/firebase/firebase';
+import SchoolForm from './components/SchoolForm';
 
 // Sample athlete profile data - used as default when no profile exists
 const defaultAthleteProfile: Omit<AthleteProfile, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -52,6 +54,7 @@ export default function Dashboard() {
   const [showMessageForm, setShowMessageForm] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const [editingSchool, setEditingSchool] = useState<School | null>(null);
 
   // Add logging for current user
   useEffect(() => {
@@ -490,7 +493,6 @@ export default function Dashboard() {
                       onReply={handleReply}
                       userId={user.uid}
                       onDelete={() => {
-                        // Remove the deleted thread from the state
                         setCommunications(prev => prev.filter(t => t.id !== thread.id));
                       }}
                     />
@@ -509,7 +511,7 @@ export default function Dashboard() {
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto text-center px-4 relative -z-10">
+              <div className="flex flex-col items-center justify-center h-full max-w-3xl mx-auto text-center px-4">
                 {/* Decorative background elements */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                   <div className="absolute top-1/4 -right-24 w-96 h-96 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full opacity-50 blur-3xl"></div>
@@ -583,6 +585,19 @@ export default function Dashboard() {
           onSubmit={handleUpdateProfile}
           onCancel={() => setIsEditingProfile(false)}
           userId={user.uid}
+        />
+      )}
+
+      {/* School Form Modal */}
+      {editingSchool && (
+        <SchoolForm
+          school={editingSchool}
+          onSubmit={async (schoolData) => {
+            await updateSchool(editingSchool.id, schoolData, user.uid);
+            setEditingSchool(null);
+            loadSchools();
+          }}
+          onCancel={() => setEditingSchool(null)}
         />
       )}
     </div>
